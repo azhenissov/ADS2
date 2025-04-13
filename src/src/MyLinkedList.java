@@ -2,139 +2,341 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * A doubly-linked list implementation that provides fast insertions and deletions.
+ * @param <T> the type of elements stored in this list
+ */
 public class MyLinkedList<T extends Comparable<T>> implements MyList<T> {
-    private Node<T> head; // reference to the first node
-    private Node<T> tail; // reference to the last node
-    private int size;     // number of elements in the list
+    /**
+     * Internal node class for the linked list
+     */
+    private class ListNode {
+        T value;
+        ListNode previous;
+        ListNode next;
 
-    // Node class for doubly linked list
-    private static class Node<T> {
-        T item;         // value stored in the node
-        Node<T> next;   // reference to the next node
-        Node<T> prev;   // reference to the previous node
-
-        Node(T item) {
-            this.item = item;
+        ListNode(T value) {
+            this.value = value;
+            this.previous = null;
+            this.next = null;
         }
     }
 
-    // Constructor initializes an empty list
+    // References to first and last nodes
+    private ListNode firstNode;
+    private ListNode lastNode;
+
+    // Number of elements
+    private int elementCount;
+
+    /**
+     * Creates an empty linked list
+     */
     public MyLinkedList() {
-        head = null;
-        tail = null;
-        size = 0;
+        firstNode = null;
+        lastNode = null;
+        elementCount = 0;
     }
 
-    // Sorts using natural order (calls comparator version)
+    /**
+     * Finds a node at a specific position
+     */
+    private ListNode findNodeAt(int position) {
+        if (position < 0 || position >= elementCount) {
+            throw new IndexOutOfBoundsException("Position: " + position + ", Size: " + elementCount);
+        }
+
+        ListNode current;
+
+        // Optimize traversal by starting from the closest end
+        if (position < elementCount / 2) {
+            // Start from the beginning
+            current = firstNode;
+            for (int i = 0; i < position; i++) {
+                current = current.next;
+            }
+        } else {
+            // Start from the end
+            current = lastNode;
+            for (int i = elementCount - 1; i > position; i--) {
+                current = current.previous;
+            }
+        }
+
+        return current;
+    }
+
+    @Override
+    public void add(T element) {
+        ListNode newNode = new ListNode(element);
+
+        if (elementCount == 0) {
+            // First element in the list
+            firstNode = lastNode = newNode;
+        } else {
+            // Link new node at the end
+            newNode.previous = lastNode;
+            lastNode.next = newNode;
+            lastNode = newNode;
+        }
+
+        elementCount++;
+    }
+
+    @Override
+    public void set(int position, T element) {
+        findNodeAt(position).value = element;
+    }
+
+    @Override
+    public void add(int position, T element) {
+        if (position < 0 || position > elementCount) {
+            throw new IndexOutOfBoundsException("Position: " + position + ", Size: " + elementCount);
+        }
+
+        if (position == 0) {
+            // Add at beginning
+            addFirst(element);
+        } else if (position == elementCount) {
+            // Add at end
+            addLast(element);
+        } else {
+            // Add in the middle
+            ListNode successor = findNodeAt(position);
+            ListNode predecessor = successor.previous;
+
+            ListNode newNode = new ListNode(element);
+            newNode.next = successor;
+            newNode.previous = predecessor;
+
+            predecessor.next = newNode;
+            successor.previous = newNode;
+
+            elementCount++;
+        }
+    }
+
+    @Override
+    public void addFirst(T element) {
+        ListNode newNode = new ListNode(element);
+
+        if (elementCount == 0) {
+            // First element in the list
+            firstNode = lastNode = newNode;
+        } else {
+            // Link new node at the beginning
+            newNode.next = firstNode;
+            firstNode.previous = newNode;
+            firstNode = newNode;
+        }
+
+        elementCount++;
+    }
+
+    @Override
+    public void addLast(T element) {
+        add(element);
+    }
+
+    @Override
+    public T get(int position) {
+        return findNodeAt(position).value;
+    }
+
+    @Override
+    public T getFirst() {
+        if (elementCount == 0) {
+            throw new NoSuchElementException("List is empty");
+        }
+        return firstNode.value;
+    }
+
+    @Override
+    public T getLast() {
+        if (elementCount == 0) {
+            throw new NoSuchElementException("List is empty");
+        }
+        return lastNode.value;
+    }
+
+    @Override
+    public void remove(int position) {
+        ListNode nodeToRemove = findNodeAt(position);
+
+        // Update links
+        if (nodeToRemove.previous != null) {
+            nodeToRemove.previous.next = nodeToRemove.next;
+        } else {
+            // Removing first node
+            firstNode = nodeToRemove.next;
+        }
+
+        if (nodeToRemove.next != null) {
+            nodeToRemove.next.previous = nodeToRemove.previous;
+        } else {
+            // Removing last node
+            lastNode = nodeToRemove.previous;
+        }
+
+        // Help GC
+        nodeToRemove.previous = null;
+        nodeToRemove.next = null;
+
+        elementCount--;
+    }
+
+    @Override
+    public void removeFirst() {
+        if (elementCount == 0) {
+            throw new NoSuchElementException("List is empty");
+        }
+
+        if (elementCount == 1) {
+            // Only one element
+            firstNode = lastNode = null;
+        } else {
+            ListNode oldFirst = firstNode;
+            firstNode = firstNode.next;
+            firstNode.previous = null;
+
+            // Help GC
+            oldFirst.next = null;
+        }
+
+        elementCount--;
+    }
+
+    @Override
+    public void removeLast() {
+        if (elementCount == 0) {
+            throw new NoSuchElementException("List is empty");
+        }
+
+        if (elementCount == 1) {
+            // Only one element
+            firstNode = lastNode = null;
+        } else {
+            ListNode oldLast = lastNode;
+            lastNode = lastNode.previous;
+            lastNode.next = null;
+
+            // Help GC
+            oldLast.previous = null;
+        }
+
+        elementCount--;
+    }
+
     @Override
     public void sort() {
         sort(Comparator.naturalOrder());
     }
 
-    // Returns node at specific index by traversing from head or tail
-    private Node<T> getNodeAt(int index) {
-        if (index < size / 2) { // If index is in the first half, traverse from head
-            Node<T> current = head;
-            for (int i = 0; i < index; i++) {
-                current = current.next;
-            }
-            return current;
-        } else { // If index is in the second half, traverse from tail
-            Node<T> current = tail;
-            for (int i = size - 1; i > index; i--) {
-                current = current.prev;
-            }
-            return current;
-        }
-    }
-
-    // Sets a value at the given index
+    @SuppressWarnings("unchecked")
     @Override
-    public void set(int index, T element) {
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
+    public void sort(Comparator<? super T> comparator) {
+        if (elementCount <= 1) {
+            return; // Already sorted
         }
-        getNodeAt(index).item = element;
-    }
 
-    // Checks if an element exists in the list
-    @Override
-    public boolean exists(Object o) {
-        Node<T> current = head;
-        while (current != null) {
-            if (current.item.equals(o)) {
-                return true;
-            }
+        // Convert to array for sorting
+        T[] tempArray = (T[]) new Comparable[elementCount];
+        ListNode current = firstNode;
+        for (int i = 0; i < elementCount; i++) {
+            tempArray[i] = current.value;
             current = current.next;
         }
-        return false;
+
+        // Sort the array
+        java.util.Arrays.sort(tempArray, comparator);
+
+        // Copy back to linked list
+        current = firstNode;
+        for (int i = 0; i < elementCount; i++) {
+            current.value = tempArray[i];
+            current = current.next;
+        }
     }
 
-    // Returns the first element
     @Override
-    public T getFirst() {
-        if (head == null) {
-            throw new NoSuchElementException("List is empty");
+    public int indexOf(Object target) {
+        ListNode current = firstNode;
+        int index = 0;
+
+        while (current != null) {
+            if (current.value.equals(target)) {
+                return index;
+            }
+            current = current.next;
+            index++;
         }
-        return head.item;
+
+        return -1;
     }
 
-    // Returns the last element
     @Override
-    public T getLast() {
-        if (tail == null) {
-            throw new NoSuchElementException("List is empty");
+    public int lastIndexOf(Object target) {
+        ListNode current = lastNode;
+        int index = elementCount - 1;
+
+        while (current != null) {
+            if (current.value.equals(target)) {
+                return index;
+            }
+            current = current.previous;
+            index--;
         }
-        return tail.item;
+
+        return -1;
     }
 
-    // Removes the last element
     @Override
-    public void removeLast() {
-        if (tail == null) {
-            throw new IllegalStateException("List is empty");
-        }
-        if (tail.prev != null) {
-            tail = tail.prev;
-            tail.next = null;
-        } else {
-            head = null;
-            tail = null;
-        }
-        size--;
+    public boolean exists(Object target) {
+        return indexOf(target) != -1;
     }
 
-    // Clears the list
+    @Override
+    public Object[] toArray() {
+        Object[] result = new Object[elementCount];
+        ListNode current = firstNode;
+
+        for (int i = 0; i < elementCount; i++) {
+            result[i] = current.value;
+            current = current.next;
+        }
+
+        return result;
+    }
+
     @Override
     public void clear() {
-        head = null;
-        tail = null;
-        size = 0;
-    }
-
-    // Adds element to the beginning of the list
-    @Override
-    public void addFirst(T element) {
-        Node<T> newNode = new Node<>(element);
-        if (head == null) {
-            head = tail = newNode;
-        } else {
-            newNode.next = head;
-            head.prev = newNode;
-            head = newNode;
+        // Help GC by breaking links
+        ListNode current = firstNode;
+        while (current != null) {
+            ListNode next = current.next;
+            current.previous = null;
+            current.next = null;
+            current = next;
         }
-        size++;
+
+        firstNode = null;
+        lastNode = null;
+        elementCount = 0;
     }
 
-    // Returns an iterator for the list
+    @Override
+    public int size() {
+        return elementCount;
+    }
+
     @Override
     public Iterator<T> iterator() {
         return new Iterator<T>() {
-            private Node<T> currentNode = head;
+            private ListNode pointer = firstNode;
 
             @Override
             public boolean hasNext() {
-                return currentNode != null;
+                return pointer != null;
             }
 
             @Override
@@ -142,170 +344,11 @@ public class MyLinkedList<T extends Comparable<T>> implements MyList<T> {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 }
-                T item = currentNode.item;
-                currentNode = currentNode.next;
-                return item;
+
+                T value = pointer.value;
+                pointer = pointer.next;
+                return value;
             }
         };
-    }
-
-    // Removes the first element
-    @Override
-    public void removeFirst() {
-        if (head == null) {
-            throw new IllegalStateException("List is empty");
-        }
-        if (head.next != null) {
-            head = head.next;
-            head.prev = null;
-        } else {
-            head = tail = null;
-        }
-        size--;
-    }
-
-    // Converts the list to an array
-    @Override
-    public Object[] toArray() {
-        Object[] array = new Object[size];
-        Node<T> current = head;
-        int index = 0;
-        while (current != null) {
-            array[index++] = current.item;
-            current = current.next;
-        }
-        return array;
-    }
-
-    // Adds an element to the end (uses add)
-    @Override
-    public void addLast(T element) {
-        add(element);
-    }
-
-    // Returns index of the first occurrence
-    @Override
-    public int indexOf(Object o) {
-        Node<T> current = head;
-        int index = 0;
-        while (current != null) {
-            if (current.item.equals(o)) {
-                return index;
-            }
-            current = current.next;
-            index++;
-        }
-        return -1;
-    }
-
-    // Returns index of the last occurrence
-    @Override
-    public int lastIndexOf(Object o) {
-        Node<T> current = tail;
-        int index = size - 1;
-        while (current != null) {
-            if (current.item.equals(o)) {
-                return index;
-            }
-            current = current.prev;
-            index--;
-        }
-        return -1;
-    }
-
-    // Returns element at a given index
-    @Override
-    public T get(int index) {
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
-        }
-        return getNodeAt(index).item;
-    }
-
-    // Sorts list using provided comparator
-    @Override
-    public void sort(Comparator<? super T> comparator) {
-        if (size <= 1) {
-            return; // already sorted
-        }
-
-        Object[] array = toArray();
-        @SuppressWarnings("unchecked")
-        T[] typedArray = (T[]) array;
-        java.util.Arrays.sort(typedArray, comparator);
-
-        Node<T> current = head;
-        for (T item : typedArray) {
-            current.item = item;
-            current = current.next;
-        }
-    }
-
-    // Returns the size of the list
-    @Override
-    public int size() {
-        return size;
-    }
-
-    // Removes an element at a specific index
-    @Override
-    public void remove(int index) {
-        if (index < 0 || index >= size) {
-            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
-        }
-
-        Node<T> toRemove = getNodeAt(index);
-
-        if (toRemove.prev != null) {
-            toRemove.prev.next = toRemove.next;
-        } else {
-            head = toRemove.next;
-        }
-
-        if (toRemove.next != null) {
-            toRemove.next.prev = toRemove.prev;
-        } else {
-            tail = toRemove.prev;
-        }
-
-        toRemove.next = null;
-        toRemove.prev = null;
-        size--;
-    }
-
-    // Adds an element at a specific index
-    @Override
-    public void add(int index, T element) {
-        if (index < 0 || index > size) {
-            throw new IndexOutOfBoundsException("Index out of bounds");
-        }
-
-        if (index == 0) {
-            addFirst(element);
-        } else if (index == size) {
-            addLast(element);
-        } else {
-            Node<T> newNode = new Node<>(element);
-            Node<T> current = getNodeAt(index);
-            newNode.next = current;
-            newNode.prev = current.prev;
-            current.prev.next = newNode;
-            current.prev = newNode;
-            size++;
-        }
-    }
-
-    // Adds an element to the end of the list
-    @Override
-    public void add(T element) {
-        Node<T> newNode = new Node<>(element);
-        if (tail == null) {
-            head = tail = newNode;
-        } else {
-            tail.next = newNode;
-            newNode.prev = tail;
-            tail = newNode;
-        }
-        size++;
     }
 }
